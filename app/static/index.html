@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tata Steel Anti-Pilferage Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        #map { height: 450px; width: 100%; border-radius: 0.5rem; }
+        [v-cloak] { display: none; }
+        .blink { animation: blinker 1.5s linear infinite; }
+        @keyframes blinker { 50% { opacity: 0; } }
+    </style>
+</head>
+<body class="bg-slate-50 font-sans text-slate-800">
+    <div id="app" v-cloak class="min-h-screen flex flex-col">
+        
+        <!-- Top Navigation / Summary Bar -->
+        <header class="bg-blue-900 text-white shadow-lg z-10">
+            <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+                <div class="flex items-center space-x-3">
+                    <i class="ph ph-truck text-3xl"></i>
+                    <div>
+                        <h1 class="text-xl font-bold leading-tight">Rebar Transit Anti-Pilferage Console</h1>
+                        <p class="text-xs text-blue-200">AI-Led Anti-Pilferage System</p>
+                        <p class="text-[10px] text-blue-300 mt-0.5">Real-time AI console to detect rebar pilferage using GPS, load cells, and vision, mapped to Tata Steel SOPs.</p>
+                    </div>
+                </div>
+
+                <!-- Fleet Summary -->
+                <div class="hidden md:flex space-x-6 text-sm">
+                    <div class="flex flex-col items-center">
+                        <span class="text-blue-300 text-xs uppercase tracking-wider">Active</span>
+                        <span class="font-bold text-lg">{{ fleetSummary.active_vehicles }}</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <span class="text-blue-300 text-xs uppercase tracking-wider">Under Alert</span>
+                        <span class="font-bold text-lg" :class="fleetSummary.under_alert > 0 ? 'text-red-400 blink' : 'text-green-400'">
+                            {{ fleetSummary.under_alert }}
+                        </span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <span class="text-blue-300 text-xs uppercase tracking-wider">System Status</span>
+                        <span class="font-bold text-green-400 flex items-center">
+                            <span class="w-2 h-2 rounded-full bg-green-400 mr-1"></span> Online
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Business Impact Strip (Simulated) -->
+        <div class="bg-white border-b border-slate-200 shadow-sm">
+            <div class="container mx-auto px-4 py-2 flex justify-between items-center text-xs">
+                <div class="flex space-x-6 text-slate-600">
+                    <span class="font-bold text-blue-900 uppercase tracking-wide flex items-center">
+                        Business Impact 
+                        <span class="ml-2 bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded text-[10px] font-normal normal-case">Simulated</span>
+                    </span>
+                    <span class="flex items-center"><i class="ph ph-trend-down text-green-600 mr-1"></i> Pilferage Risk: <strong class="ml-1 text-slate-800">-65% vs baseline</strong></span>
+                    <span class="flex items-center"><i class="ph ph-lightning text-orange-600 mr-1"></i> Avg Detection: <strong class="ml-1 text-slate-800">< 5 mins</strong></span>
+                    <span class="flex items-center"><i class="ph ph-check-circle text-blue-600 mr-1"></i> Trips Monitored: <strong class="ml-1 text-slate-800">24 today</strong></span>
+                </div>
+            </div>
+        </div>
+
+        <main class="flex-grow container mx-auto p-4 grid grid-cols-12 gap-6">
+            
+            <!-- Sidebar: Vehicle List & Data Sources -->
+            <div class="col-span-12 md:col-span-3 space-y-6">
+                
+                <!-- Vehicle Selector -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="bg-slate-100 px-4 py-3 border-b border-slate-200 font-semibold text-sm text-slate-600 flex justify-between items-center">
+                        <span class="uppercase">Fleet Overview</span>
+                        <i class="ph ph-list"></i>
+                    </div>
+                    <div class="p-2">
+                         <div v-if="trucks.length === 0" class="text-sm text-gray-500 p-4 text-center">
+                            No active trips. Run simulation.
+                        </div>
+                        <div v-for="truck in trucks" :key="truck" 
+                             @click="selectTruck(truck)"
+                             class="flex items-center justify-between p-3 rounded cursor-pointer hover:bg-blue-50 transition-colors"
+                             :class="selectedTruck === truck ? 'bg-blue-50 ring-1 ring-blue-500' : ''">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 rounded-full flex items-center justify-center bg-slate-200 text-slate-600">
+                                    <i class="ph ph-truck"></i>
+                                </div>
+                                <div>
+                                    <div class="font-bold text-sm">{{ truck }}</div>
+                                    <!-- Status Chips -->
+                                    <div v-if="truck === 'KA-02-XY-5678' || (truck === selectedTruck && alerts.length > 0)" class="mt-1">
+                                         <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-red-500 mr-1 blink"></span> Under Alert
+                                         </span>
+                                    </div>
+                                    <div v-else class="mt-1">
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-green-500 mr-1"></span> En Route
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            <i class="ph ph-caret-right text-gray-400"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data Sources Card -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200">
+                    <div class="bg-slate-100 px-4 py-3 border-b border-slate-200 font-semibold text-sm text-slate-600 uppercase">
+                        Data Integration Status
+                    </div>
+                    <div class="p-4 space-y-3">
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="flex items-center"><i class="ph ph-globe-hemisphere-west mr-2 text-blue-500"></i> GPS / Telematics</span>
+                            <span class="px-2 py-0.5 rounded text-xs font-bold bg-green-100 text-green-700">ONLINE</span>
+                        </div>
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="flex items-center"><i class="ph ph-scales mr-2 text-blue-500"></i> Load Cells</span>
+                            <span class="px-2 py-0.5 rounded text-xs font-bold bg-green-100 text-green-700">ONLINE</span>
+                        </div>
+                         <div class="flex justify-between items-center text-sm">
+                            <span class="flex items-center"><i class="ph ph-camera mr-2 text-gray-400"></i> CCTV / Vision</span>
+                            <span class="px-2 py-0.5 rounded text-xs font-bold bg-yellow-100 text-yellow-700">STANDBY</span>
+                        </div>
+                    </div>
+                </div>
+
+                 <!-- AI Agents Status -->
+                 <div class="bg-white rounded-lg shadow-sm border border-slate-200">
+                    <div class="bg-slate-100 px-4 py-3 border-b border-slate-200 font-semibold text-sm text-slate-600 uppercase">
+                        Active AI Agents
+                    </div>
+                    <div class="p-4 space-y-3">
+                        <div class="flex items-center space-x-3">
+                            <div class="p-1.5 bg-purple-100 rounded text-purple-600"><i class="ph ph-map-trifold"></i></div>
+                            <div>
+                                <div class="text-xs font-bold">Route Monitor</div>
+                                <div class="text-[10px] text-gray-500">Geofence & Deviation Check</div>
+                            </div>
+                        </div>
+                         <div class="flex items-center space-x-3">
+                            <div class="p-1.5 bg-indigo-100 rounded text-indigo-600"><i class="ph ph-scales"></i></div>
+                            <div>
+                                <div class="text-xs font-bold">Weight Guard</div>
+                                <div class="text-[10px] text-gray-500">Real-time Load Integrity</div>
+                            </div>
+                        </div>
+                         <div class="flex items-center space-x-3">
+                            <div class="p-1.5 bg-orange-100 rounded text-orange-600"><i class="ph ph-clock-countdown"></i></div>
+                            <div>
+                                <div class="text-xs font-bold">Stop Analyzer</div>
+                                <div class="text-[10px] text-gray-500">Unauthorized Duration Check</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SOP & Geofence Config -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200">
+                    <div class="bg-slate-100 px-4 py-3 border-b border-slate-200 font-semibold text-sm text-slate-600 uppercase">
+                        SOP & Geofence Configuration
+                    </div>
+                    <div class="p-4 space-y-3 text-xs">
+                        <!-- Audit Log -->
+                        <div class="mb-3 pb-2 border-b border-slate-100">
+                            <div class="flex items-center text-gray-500 mb-1">
+                                <i class="ph ph-clock-counter-clockwise mr-1"></i>
+                                <span class="font-bold text-[10px] uppercase">Last Update</span>
+                            </div>
+                            <div class="text-slate-700">24 Jan 2026 by <span class="font-bold">Control Room Supervisor</span> (ID TS-OPS-23)</div>
+                        </div>
+
+                        <!-- Manual Override -->
+                        <div class="mb-3 pb-2 border-b border-slate-100 bg-yellow-50 -mx-4 px-4 py-2 border-l-4 border-l-yellow-400">
+                             <div class="flex items-center text-yellow-700 mb-1">
+                                <i class="ph ph-toggle-left mr-1"></i>
+                                <span class="font-bold text-[10px] uppercase">Manual Override Active</span>
+                            </div>
+                            <div class="text-slate-700 italic">Allow stop > 20 min at Midway Dhaba (Valid till 2:00 AM).</div>
+                        </div>
+
+                        <div>
+                            <div class="font-bold text-slate-700 mb-1">Active Geofences</div>
+                            <ul class="list-disc text-gray-500 space-y-0.5 pl-4">
+                                <li>Jamshedpur Plant (Radius: 2km)</li>
+                                <li>Midway Dhaba (Radius: 200m)</li>
+                                <li>Kolkata Hub (Radius: 5km)</li>
+                            </ul>
+                        </div>
+                        <div class="pt-2 border-t border-slate-100">
+                            <div class="font-bold text-slate-700 mb-1">Active SOP Rules</div>
+                            <ul class="space-y-1 text-gray-500">
+                                <li><span class="font-semibold text-slate-700">SOP-089 (Stop):</span> Stop > 15 min outside approved zone → Alert.</li>
+                                <li><span class="font-semibold text-slate-700">SOP-102 (Weight):</span> Drop > 10% outside hub → Lockout.</li>
+                                <li><span class="font-semibold text-slate-700">SOP-075 (Route):</span> Deviation > 5 km from corridor → Control room notification.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Demo Narrative Flow -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200">
+                    <div class="bg-slate-100 px-4 py-3 border-b border-slate-200 font-semibold text-sm text-slate-600 uppercase">
+                        Scenario Flow
+                    </div>
+                    <div class="p-4">
+                        <ol class="relative border-l border-slate-200 ml-2">                  
+                            <li class="mb-4 ml-4">
+                                <div class="absolute w-3 h-3 bg-slate-200 rounded-full mt-1.5 -left-1.5 border border-white"></div>
+                                <h3 class="text-xs font-semibold text-slate-900">1. Departure</h3>
+                                <p class="mb-1 text-[10px] font-normal text-gray-500">Truck leaves Jamshedpur Plant with full load inside geofence.</p>
+                            </li>
+                            <li class="mb-4 ml-4">
+                                <div class="absolute w-3 h-3 bg-slate-200 rounded-full mt-1.5 -left-1.5 border border-white"></div>
+                                <h3 class="text-xs font-semibold text-slate-900">2. Route Deviation</h3>
+                                <p class="text-[10px] font-normal text-gray-500">Route Monitor detects 7 km deviation near Kharagpur → SOP-075.</p>
+                            </li>
+                             <li class="mb-4 ml-4">
+                                <div class="absolute w-3 h-3 bg-slate-200 rounded-full mt-1.5 -left-1.5 border border-white"></div>
+                                <h3 class="text-xs font-semibold text-slate-900">3. Suspicious Stop</h3>
+                                <p class="text-[10px] font-normal text-gray-500">Stop Analyzer flags 18 min non-whitelisted stop → SOP-089.</p>
+                            </li>
+                            <li class="mb-4 ml-4">
+                                <div class="absolute w-3 h-3 bg-slate-200 rounded-full mt-1.5 -left-1.5 border border-white"></div>
+                                <h3 class="text-xs font-semibold text-slate-900">4. Theft Event</h3>
+                                <p class="text-[10px] font-normal text-gray-500">Weight Guard detects 200kg drop. Alert escalated to CRITICAL.</p>
+                            </li>
+                             <li class="mb-4 ml-4">
+                                <div class="absolute w-3 h-3 bg-green-500 rounded-full mt-1.5 -left-1.5 border border-white"></div>
+                                <h3 class="text-xs font-semibold text-slate-900">5. Resolution</h3>
+                                <p class="text-[10px] font-normal text-gray-500">Control Room verifies via CCTV/Reweigh. Pilferage prevented.</p>
+                            </li>
+                        </ol>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Main Content: Map & Dashboard -->
+            <div class="col-span-12 md:col-span-9 space-y-6">
+                
+                <!-- Vehicle Stats Row -->
+                <div v-if="currentStatus" class="grid grid-cols-4 gap-4">
+                    <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+                        <div class="text-xs text-gray-500 uppercase">Current Speed</div>
+                        <div class="text-2xl font-bold text-slate-800">{{ currentTelemetry?.speed_kmh.toFixed(1) }} <span class="text-sm font-normal text-gray-400">km/h</span></div>
+                    </div>
+                    <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+                        <div class="text-xs text-gray-500 uppercase">Live Weight</div>
+                        <div class="text-2xl font-bold text-slate-800">{{ currentTelemetry?.weight_kg.toFixed(0) }} <span class="text-sm font-normal text-gray-400">kg</span></div>
+                    </div>
+                     <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+                        <div class="text-xs text-gray-500 uppercase">Trip Status</div>
+                        <div class="text-lg font-bold" :class="currentStatus.is_stopped ? 'text-orange-500' : 'text-green-500'">
+                            {{ currentStatus.is_stopped ? 'STOPPED' : 'IN TRANSIT' }}
+                        </div>
+                    </div>
+                     <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
+                        <div class="text-xs text-gray-500 uppercase">Last Update</div>
+                        <div class="text-sm font-mono mt-1">{{ formatTime(currentTelemetry?.timestamp) }}</div>
+                    </div>
+                </div>
+
+                <!-- Map -->
+                <div class="bg-white p-1 rounded-lg shadow-sm border border-slate-200">
+                    <div id="map"></div>
+                </div>
+
+                <!-- Intelligence Log (SOP Driven) -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200">
+                    <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                        <h2 class="font-bold text-slate-700 flex items-center">
+                            <i class="ph ph-brain text-purple-600 mr-2 text-xl"></i>
+                            SOP Enforcement & Intelligence Log
+                        </h2>
+                        <span class="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">Real-time Feed</span>
+                    </div>
+                    
+                    <div class="divide-y divide-slate-100 max-h-96 overflow-y-auto">
+                        <div v-if="alerts.length === 0" class="p-4 text-xs text-slate-700 space-y-2">
+                            <div class="flex items-start space-x-2 p-3 rounded border border-slate-200 bg-slate-50">
+                                <div class="p-1.5 bg-red-100 text-red-600 rounded"><i class="ph ph-warning-octagon"></i></div>
+                                <div class="flex-grow">
+                                    <div class="font-bold">CRITICAL – WEIGHT_MISMATCH | SOP-102</div>
+                                    <div>200kg drop detected near Kolaghat | Action: Security alerted.</div>
+                                </div>
+                            </div>
+                            <div class="flex items-start space-x-2 p-3 rounded border border-slate-200 bg-slate-50">
+                                <div class="p-1.5 bg-orange-100 text-orange-600 rounded"><i class="ph ph-warning"></i></div>
+                                <div class="flex-grow">
+                                    <div class="font-bold">HIGH – SUSPICIOUS_STOP | SOP-089</div>
+                                    <div>18 min stop at non-whitelisted dhaba | Action: Verification call.</div>
+                                </div>
+                            </div>
+                            <div class="flex items-start space-x-2 p-3 rounded border border-slate-200 bg-slate-50">
+                                <div class="p-1.5 bg-green-100 text-green-700 rounded"><i class="ph ph-shield-check"></i></div>
+                                <div class="flex-grow">
+                                    <div class="font-bold">RESOLVED – WEIGHT_MISMATCH | SOP-102</div>
+                                    <div>No loss confirmed at Kolkata Hub | Action: Alert closed.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div v-for="alert in reversedAlerts" :key="alert.alert_id" class="p-4 hover:bg-slate-50 transition-colors">
+                            <div class="flex items-start space-x-4">
+                                <!-- Severity Icon -->
+                                <div class="mt-1">
+                                    <div v-if="alert.severity === 'CRITICAL'" class="p-2 bg-red-100 text-red-600 rounded-lg"><i class="ph ph-warning-octagon text-xl"></i></div>
+                                    <div v-else-if="alert.severity === 'HIGH'" class="p-2 bg-orange-100 text-orange-600 rounded-lg"><i class="ph ph-warning text-xl"></i></div>
+                                    <div v-else class="p-2 bg-yellow-100 text-yellow-600 rounded-lg"><i class="ph ph-info text-xl"></i></div>
+                                </div>
+                                
+                                <div class="flex-grow">
+                                    <div class="flex justify-between items-start">
+                                        <div class="flex items-center">
+                                            <span class="text-xs font-bold uppercase tracking-wider" 
+                                                :class="{
+                                                    'text-red-600': alert.severity === 'CRITICAL',
+                                                    'text-orange-600': alert.severity === 'HIGH',
+                                                    'text-yellow-600': alert.severity === 'MEDIUM'
+                                                }">
+                                                {{ alert.type }}
+                                            </span>
+                                            <!-- Severity Tag -->
+                                            <span v-if="alert.severity === 'CRITICAL'" class="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">CRITICAL</span>
+                                            <span v-else-if="alert.severity === 'HIGH'" class="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-700 border border-orange-200">HIGH</span>
+                                            <span v-else-if="alert.severity === 'MEDIUM'" class="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold bg-yellow-100 text-yellow-700 border border-yellow-200">MEDIUM</span>
+
+                                            <!-- Status Tag -->
+                                            <span v-if="alert.status === 'RESOLVED'" class="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 border border-green-200">RESOLVED</span>
+                                            <span v-else class="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-100">OPEN</span>
+
+                                            <span class="text-xs text-gray-400 ml-2">via {{ alert.agent_name }}</span>
+                                        </div>
+                                        <span class="text-xs text-gray-400 font-mono">{{ formatTime(alert.timestamp) }}</span>
+                                    </div>
+                                    
+                                    <h3 class="font-bold text-slate-800 text-sm mt-1">{{ alert.description }}</h3>
+                                    
+                                    <!-- Rich Metadata Box -->
+                                    <div class="mt-3 bg-slate-50 rounded border border-slate-200 p-3 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                                        <div v-if="alert.why_flagged">
+                                            <span class="font-semibold text-slate-500 block mb-1">Why Flagged?</span>
+                                            <span class="text-slate-700">{{ alert.why_flagged }}</span>
+                                        </div>
+                                         <div v-if="alert.sop_rule">
+                                            <span class="font-semibold text-slate-500 block mb-1">SOP Rule Triggered</span>
+                                            <span class="text-slate-700">{{ alert.sop_rule }}</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Action Taken -->
+                                    <div v-if="alert.action_taken" class="mt-2 flex items-center text-xs font-bold text-blue-700 bg-blue-50 px-2 py-1 rounded w-max">
+                                        <i class="ph ph-lightning mr-1"></i> ACTION: {{ alert.action_taken }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+
+        <footer class="bg-white border-t border-slate-200 mt-auto">
+            <div class="container mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center text-xs text-slate-500">
+                <div class="mb-2 md:mb-0">
+                    <span class="font-bold">Designed for:</span> AI-Led Prevention of Pilferage in Rebar Transportation – Tata Steel problem statement
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span>Solution by Team moni_chirag – AI & DevOps</span>
+                    <span class="text-slate-400">|</span>
+                    <span class="text-slate-500">FastAPI • Vue • Leaflet • Python AI</span>
+                    <span>&copy; 2026</span>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        const { createApp } = Vue
+
+        createApp({
+            data() {
+                return {
+                    trucks: [],
+                    selectedTruck: null,
+                    currentStatus: null,
+                    currentTelemetry: null,
+                    alerts: [],
+                    fleetSummary: { active_vehicles: 0, under_alert: 0 },
+                    map: null,
+                    marker: null,
+                    polling: null
+                }
+            },
+            computed: {
+                reversedAlerts() {
+                    return [...this.alerts].reverse();
+                }
+            },
+            methods: {
+                formatTime(isoString) {
+                    if (!isoString) return '--:--:--';
+                    return new Date(isoString).toLocaleTimeString();
+                },
+                async fetchSummary() {
+                    try {
+                        const res = await axios.get('/api/v1/fleet/summary');
+                        this.fleetSummary = res.data;
+                    } catch (e) { console.error(e); }
+                },
+                async fetchTrucks() {
+                    try {
+                        const res = await axios.get('/api/v1/trucks');
+                        this.trucks = res.data;
+                        if (this.trucks.length > 0 && !this.selectedTruck) {
+                            this.selectTruck(this.trucks[0]);
+                        }
+                    } catch (e) { console.error(e); }
+                },
+                selectTruck(truckId) {
+                    this.selectedTruck = truckId;
+                    this.fetchStatus();
+                },
+                async fetchStatus() {
+                    if (!this.selectedTruck) return;
+                    try {
+                        const [statusRes, alertsRes] = await Promise.all([
+                            axios.get(`/api/v1/status/${this.selectedTruck}`),
+                            axios.get(`/api/v1/alerts?truck_id=${this.selectedTruck}`)
+                        ]);
+
+                        this.currentStatus = statusRes.data;
+                        this.currentTelemetry = this.currentStatus.last_telemetry;
+                        this.alerts = alertsRes.data;
+
+                        this.updateMap();
+                    } catch (e) { console.error(e); }
+                },
+                initMap() {
+                    // Center on the Jamshedpur-Kolkata corridor
+                    this.map = L.map('map').setView([22.5, 87.3], 9);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '© OpenStreetMap contributors'
+                    }).addTo(this.map);
+
+                    // Static Landmarks (Jamshedpur -> Kolkata)
+                    const landmarks = [
+                        { name: "Jamshedpur Plant", lat: 22.8046, lng: 86.2029, type: 'start' },
+                        { name: "Kharagpur (Check)", lat: 22.3460, lng: 87.2320, type: 'mid' },
+                        { name: "Kolaghat (Check)", lat: 22.4327, lng: 87.8672, type: 'mid' },
+                        { name: "Kolkata Hub", lat: 22.5726, lng: 88.3639, type: 'end' }
+                    ];
+
+                    landmarks.forEach(l => {
+                        L.circleMarker([l.lat, l.lng], {
+                            color: l.type === 'start' ? '#16a34a' : (l.type === 'end' ? '#2563eb' : '#94a3b8'),
+                            fillColor: l.type === 'start' ? '#bbf7d0' : (l.type === 'end' ? '#bfdbfe' : '#e2e8f0'),
+                            fillOpacity: 0.9,
+                            radius: 6,
+                            weight: 2
+                        }).addTo(this.map).bindTooltip(l.name, { permanent: true, direction: 'top', offset: [0, -5], className: 'text-xs font-bold' });
+                    });
+
+                    // Planned Route Line
+                    const routePoints = [
+                        [22.8046, 86.2029],
+                        [22.3460, 87.2320],
+                        [22.4327, 87.8672],
+                        [22.5726, 88.3639]
+                    ];
+                    L.polyline(routePoints, { color: '#64748b', dashArray: '5, 10', weight: 2 }).addTo(this.map);
+
+                    // Simulated Deviation Path (Red) - Visualizing SOP-075
+                    const deviationPoints = [
+                        [22.3460, 87.2320], // Deviation Start
+                        [22.3000, 87.3000]  // Detected Location
+                    ];
+                    L.polyline(deviationPoints, { color: '#ef4444', weight: 3, dashArray: '5, 5' })
+                        .addTo(this.map)
+                        .bindTooltip("Detected Deviation (SOP-075)", { direction: 'right', className: 'text-red-600 font-bold text-xs' });
+                },
+                updateMap() {
+                    if (!this.currentTelemetry || !this.map) return;
+                    
+                    const lat = this.currentTelemetry.location.latitude;
+                    const lng = this.currentTelemetry.location.longitude;
+                    
+                    const hasAlert = this.alerts && this.alerts.some(a => a.status !== 'RESOLVED');
+
+                    if (!this.marker) {
+                        this.marker = L.marker([lat, lng]).addTo(this.map);
+                    } else {
+                        this.marker.setLatLng([lat, lng]);
+                    }
+
+                    // Rich Popup Content
+                    const popupContent = `
+                        <div class="min-w-[160px] font-sans">
+                            <div class="font-bold text-slate-800 mb-2 border-b border-slate-200 pb-1 flex justify-between items-center">
+                                <span>${this.selectedTruck}</span>
+                                <span class="text-[10px] bg-slate-100 px-1 rounded">Live</span>
+                            </div>
+                            <div class="space-y-1 text-xs text-slate-600">
+                                <div class="flex justify-between items-center"><span>Speed:</span> <span class="font-mono font-bold text-slate-800">${this.currentTelemetry.speed_kmh.toFixed(1)} km/h</span></div>
+                                <div class="flex justify-between items-center"><span>Weight:</span> <span class="font-mono font-bold text-slate-800">${this.currentTelemetry.weight_kg.toFixed(0)} kg</span></div>
+                            </div>
+                            <div class="mt-3 pt-2 border-t border-slate-200 text-xs font-bold text-center">
+                                ${hasAlert 
+                                    ? '<span class="text-red-600 flex items-center justify-center"><i class="ph-warning mr-1"></i> UNDER ALERT</span>' 
+                                    : '<span class="text-green-600 flex items-center justify-center"><i class="ph-check-circle mr-1"></i> NORMAL STATUS</span>'}
+                            </div>
+                        </div>
+                    `;
+
+                    this.marker.bindPopup(popupContent).openPopup();
+                    
+                    // Center map on truck but maintain view of route
+                    // Only re-center if this is the first update or if we drift too far (optional)
+                    // For demo, keep it centered
+                    this.map.setView([lat, lng], 10);
+                },
+                startPolling() {
+                    this.polling = setInterval(() => {
+                        this.fetchTrucks();
+                        this.fetchSummary();
+                        this.fetchStatus();
+                    }, 2000);
+                }
+            },
+            mounted() {
+                this.initMap();
+                this.fetchTrucks();
+                this.fetchSummary();
+                this.startPolling();
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html>
