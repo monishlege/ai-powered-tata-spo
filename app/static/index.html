@@ -16,6 +16,8 @@
         [v-cloak] { display: none; }
         .blink { animation: blinker 1.5s linear infinite; }
         @keyframes blinker { 50% { opacity: 0; } }
+        .vehicle-icon-wrapper { background: transparent; border: none; }
+        .vehicle-icon { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: rgba(37,99,235,0.15); color: #1e3a8a; box-shadow: 0 0 0 2px rgba(37,99,235,0.25); }
     </style>
 </head>
 <body class="bg-slate-50 font-sans text-slate-800">
@@ -403,6 +405,9 @@
                     polling: null,
                     currentYear: new Date().getFullYear(),
                     lastUpdate: new Date()
+                    ,vehicleIcon: null,
+                    lastMarkerLatLng: null,
+                    animating: false
                 }
             },
             computed: {
@@ -462,6 +467,12 @@
                     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                         attribution: '© OpenStreetMap contributors'
                     }).addTo(this.map);
+                    this.vehicleIcon = L.divIcon({
+                        html: '<div class="vehicle-icon"><i class="ph ph-truck"></i></div>',
+                        className: 'vehicle-icon-wrapper',
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                    });
 
                     // Static Landmarks (Jamshedpur -> Kolkata)
                     const landmarks = [
@@ -508,9 +519,10 @@
                     const hasAlert = this.alerts && this.alerts.some(a => a.status !== 'RESOLVED');
 
                     if (!this.marker) {
-                        this.marker = L.marker([lat, lng]).addTo(this.map);
+                        this.marker = L.marker([lat, lng], { icon: this.vehicleIcon }).addTo(this.map);
+                        this.lastMarkerLatLng = L.latLng(lat, lng);
                     } else {
-                        this.marker.setLatLng([lat, lng]);
+                        this.animateMarkerTo(L.latLng(lat, lng));
                     }
 
                     // Rich Popup Content
@@ -538,6 +550,24 @@
                     // Only re-center if this is the first update or if we drift too far (optional)
                     // For demo, keep it centered
                     this.map.setView([lat, lng], 10);
+                },
+                animateMarkerTo(targetLatLng) {
+                    if (!this.marker) return;
+                    const startLatLng = this.marker.getLatLng();
+                    const duration = 1500;
+                    const startTime = performance.now();
+                    const animate = (now) => {
+                        const t = Math.min((now - startTime) / duration, 1);
+                        const lat = startLatLng.lat + (targetLatLng.lat - startLatLng.lat) * t;
+                        const lng = startLatLng.lng + (targetLatLng.lng - startLatLng.lng) * t;
+                        this.marker.setLatLng([lat, lng]);
+                        if (t < 1) {
+                            requestAnimationFrame(animate);
+                        } else {
+                            this.lastMarkerLatLng = targetLatLng;
+                        }
+                    };
+                    requestAnimationFrame(animate);
                 },
                 startPolling() {
                     this.polling = setInterval(() => {

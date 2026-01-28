@@ -64,7 +64,7 @@ class TruckSimulator:
         except:
             pass
         
-        self.current_time += timedelta(minutes=5)
+        self.current_time += timedelta(minutes=1)
 
     def run_scenario(self):
         print(f"--- Starting Simulation for {self.truck_id} ---")
@@ -77,12 +77,12 @@ class TruckSimulator:
             self._run_normal_scenario()
 
     def _run_normal_scenario(self):
-        # 1. Drive Normal
-        for i in range(20):
-            self.lon += 0.02
-            self.lat -= 0.005 # Moving southeast towards Kolkata
-            self.send_telemetry(60.0, True, "Driving")
-            time.sleep(3)
+        # 1. Drive Normal (smaller steps, faster telemetry for smooth movement)
+        for i in range(60):
+            self.lon += 0.004
+            self.lat -= 0.001  # Moving southeast towards Kolkata
+            self.send_telemetry(45.0, True, "Driving")
+            time.sleep(1)
             
         # 2. Authorized Stop
         print(f"[{self.truck_id}] Arrived at Authorized Stop")
@@ -90,57 +90,57 @@ class TruckSimulator:
         old_lat, old_lon = self.lat, self.lon
         self.lat, self.lon = 22.6000, 87.0000 
         
-        for _ in range(10):
+        for _ in range(15):
             self.send_telemetry(0.0, False, "Resting at Dhaba")
-            time.sleep(3)
+            time.sleep(1)
             
         # Resume
         self.lat, self.lon = old_lat, old_lon # Back to road (approx)
         self.lat -= 0.01
         self.lon += 0.04
-        self.send_telemetry(55.0, True, "Resuming Trip")
-        time.sleep(3)
+        self.send_telemetry(40.0, True, "Resuming Trip")
+        time.sleep(1)
         
         # Finish
-        for _ in range(20):
-            self.lon += 0.02
-            self.lat -= 0.005
-            self.send_telemetry(65.0, True, "Cruising to Kolkata")
-            time.sleep(3)
+        for _ in range(80):
+            self.lon += 0.004
+            self.lat -= 0.001
+            self.send_telemetry(50.0, True, "Cruising to Kolkata")
+            time.sleep(1)
 
     def _run_theft_scenario(self):
         # 1. Drive Normal initially
-        for _ in range(10):
-            self.lon += 0.02
-            self.lat -= 0.005
-            self.send_telemetry(60.0, True, "Driving Normal")
-            time.sleep(3)
+        for _ in range(40):
+            self.lon += 0.004
+            self.lat -= 0.001
+            self.send_telemetry(45.0, True, "Driving Normal")
+            time.sleep(1)
 
         # 2. Deviation
         print(f"[{self.truck_id}] DEVIATING FROM ROUTE...")
-        for _ in range(10):
-            self.lat += 0.01 # Go North/Off-route
-            self.send_telemetry(50.0, True, "Route Deviation")
-            time.sleep(3)
+        for _ in range(30):
+            self.lat += 0.002  # Go North/Off-route slowly
+            self.send_telemetry(40.0, True, "Route Deviation")
+            time.sleep(1)
             
         # 3. Suspicious Stop
         print(f"[{self.truck_id}] SUSPICIOUS STOP...")
-        for _ in range(10): # 30s > 15 min threshold simulation
+        for _ in range(20):  # Shorter cycle but more frequent telemetry
             self.send_telemetry(0.0, True, "Unauthorized Stop")
-            time.sleep(3)
+            time.sleep(1)
             
         # 4. Theft Event (Weight Drop)
         print(f"[{self.truck_id}] !!! THEFT EVENT !!!")
         self.weight -= 500.0 # Drop 500kg
         self.send_telemetry(0.0, False, "Weight Drop Detected")
-        time.sleep(5) # Pause for impact
+        time.sleep(2)  # Pause for impact
         
         # 5. Fleeing
         print(f"[{self.truck_id}] Returning to route...")
-        for _ in range(10):
-            self.lat -= 0.01 # Return to main path
-            self.send_telemetry(70.0, True, "Returning to Route")
-            time.sleep(3)
+        for _ in range(30):
+            self.lat -= 0.002  # Return to main path gradually
+            self.send_telemetry(50.0, True, "Returning to Route")
+            time.sleep(1)
 
 
 def run_simulation():
