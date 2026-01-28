@@ -13,6 +13,11 @@ class IntelligenceEngine:
         self.active_trips: Dict[str, TripConfig] = {}
         self.truck_states: Dict[str, Dict] = {} 
         self.alerts: List[Alert] = []
+        self.driver_directory: Dict[str, Dict] = {
+            "KA-01-AB-1234": {"driver_name": "Ramesh Kumar", "phone": "+91-98765-43210", "company": "Monish Logistics"},
+            "KA-02-XY-5678": {"driver_name": "Suresh Patel", "phone": "+91-99876-54321", "company": "Third Party Travels"},
+            "KA-03-GH-9012": {"driver_name": "Anil Singh", "phone": "+91-91234-56789", "company": "Reliance Roadways"}
+        }
         
         # Initialize Agents
         self.anomaly_agent = AnomalyDetectionAgent()
@@ -224,3 +229,27 @@ class IntelligenceEngine:
         state["last_telemetry"] = data
         
         return all_alerts
+
+    def resolve_alert(self, alert_id: str) -> Alert | None:
+        for a in self.alerts:
+            if a.alert_id == alert_id:
+                a.status = "RESOLVED"
+                return a
+        return None
+
+    def get_driver_info(self, truck_id: str) -> Dict:
+        return self.driver_directory.get(truck_id, {"driver_name": "Unknown", "phone": "N/A", "company": "N/A"})
+    
+    def set_driver_info(self, truck_id: str, name: str, phone: str, company: str):
+        self.driver_directory[truck_id] = {
+            "driver_name": name,
+            "phone": phone,
+            "company": company
+        }
+    
+    def unresolve_alert(self, alert_id: str) -> Alert | None:
+        for a in self.alerts:
+            if a.alert_id == alert_id:
+                a.status = "OPEN"
+                return a
+        return None

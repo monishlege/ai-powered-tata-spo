@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from typing import List
+from pydantic import BaseModel
 from datetime import datetime, timedelta
 from app.models import TripConfig, Telemetry, Alert, GeoPoint
 from app.core.engine import IntelligenceEngine
@@ -82,3 +83,34 @@ def get_status(truck_id: str):
     if truck_id in engine.truck_states:
         return engine.truck_states[truck_id]
     raise HTTPException(status_code=404, detail="Truck not found")
+
+class ResolveRequest(BaseModel):
+    alert_id: str
+class DriverInfo(BaseModel):
+    truck_id: str
+    driver_name: str
+    phone: str
+    company: str
+
+@app.post("/api/v1/alerts/resolve", tags=["Monitoring"])
+def resolve_alert(req: ResolveRequest):
+    a = engine.resolve_alert(req.alert_id)
+    if not a:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    return a
+
+@app.post("/api/v1/alerts/unresolve", tags=["Monitoring"])
+def unresolve_alert(req: ResolveRequest):
+    a = engine.unresolve_alert(req.alert_id)
+    if not a:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    return a
+
+@app.get("/api/v1/driver/{truck_id}", tags=["Monitoring"])
+def get_driver(truck_id: str):
+    return engine.get_driver_info(truck_id)
+
+@app.post("/api/v1/driver", tags=["Monitoring"])
+def set_driver(info: DriverInfo):
+    engine.set_driver_info(info.truck_id, info.driver_name, info.phone, info.company)
+    return {"status": "ok"}

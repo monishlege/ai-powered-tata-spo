@@ -70,12 +70,120 @@
                     <span class="flex items-center"><i class="ph ph-check-circle text-blue-600 mr-1"></i> Trips Monitored: <strong class="ml-1 text-slate-800">{{ formatDate(lastUpdate) }}</strong></span>
                 </div>
             </div>
+            <div class="container mx-auto px-4 pb-2 text-xs">
+                <ul class="list-disc pl-4 text-slate-700 grid grid-cols-1 md:grid-cols-3 gap-x-6">
+                    <li>Detects pilferage within 5 minutes of event.</li>
+                    <li>Correlates GPS, weight, and CCTV in one view.</li>
+                    <li>Encodes Tata Steel SOPs as machine-readable rules.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Architecture / Data Flow Strip -->
+        <div class="bg-slate-50 border-b border-slate-200">
+            <div class="container mx-auto px-4 py-3">
+                <div class="flex items-center justify-between text-xs text-slate-700">
+                    <div class="flex items-center space-x-2">
+                        <div class="px-2 py-1 bg-blue-100 text-blue-700 rounded flex items-center space-x-1">
+                            <i class="ph ph-truck"></i><span>Truck</span>
+                        </div>
+                        <i class="ph ph-caret-right text-slate-400"></i>
+                        <div class="px-2 py-1 bg-indigo-100 text-indigo-700 rounded flex items-center space-x-1">
+                            <i class="ph ph-device-mobile"></i><span>Sensors (GPS, load cell, CCTV)</span>
+                        </div>
+                        <i class="ph ph-caret-right text-slate-400"></i>
+                        <div class="px-2 py-1 bg-cyan-100 text-cyan-700 rounded flex items-center space-x-1">
+                            <i class="ph ph-cloud"></i><span>Edge / Cloud</span>
+                        </div>
+                        <i class="ph ph-caret-right text-slate-400"></i>
+                        <div class="px-2 py-1 bg-purple-100 text-purple-700 rounded flex items-center space-x-1">
+                            <i class="ph ph-robot"></i><span>AI Agents</span>
+                        </div>
+                        <i class="ph ph-caret-right text-slate-400"></i>
+                        <div class="px-2 py-1 bg-emerald-100 text-emerald-700 rounded flex items-center space-x-1">
+                            <i class="ph ph-chalkboard-teacher"></i><span>Control Room Dashboard</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-2 grid grid-cols-5 gap-2 text-[10px] text-slate-600">
+                    <div>Telematics stream; route coordination</div>
+                    <div>Live location, axle loads, CCTV snapshots</div>
+                    <div>Secure ingestion; rule engine</div>
+                    <div>Weight Guard, Route Monitor, Stop Analyzer</div>
+                    <div>Unified view; SOP enforcement & resolution</div>
+                </div>
+            </div>
         </div>
 
         <main class="flex-grow container mx-auto p-4 grid grid-cols-12 gap-6">
             
             <!-- Sidebar: Vehicle List & Data Sources -->
             <div class="col-span-12 md:col-span-3 space-y-6">
+                
+                <!-- Add Vehicle & Trip -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="bg-slate-100 px-4 py-3 border-b border-slate-200 font-semibold text-sm text-slate-600 flex justify-between items-center">
+                        <span class="uppercase">Add Vehicle & Trip</span>
+                        <i class="ph ph-plus-circle"></i>
+                    </div>
+                    <div class="p-4 text-xs space-y-2">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-slate-500 mb-1">Vehicle Number</label>
+                                <input v-model="newTrip.truck_id" class="w-full border rounded px-2 py-1" placeholder="KA-04-AB-1234" />
+                            </div>
+                            <div>
+                                <label class="block text-slate-500 mb-1">Weight (kg)</label>
+                                <input v-model.number="newTrip.weight" type="number" class="w-full border rounded px-2 py-1" placeholder="25000" />
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-slate-500 mb-1">Start Point</label>
+                                <select v-model="newTrip.startPreset" class="w-full border rounded px-2 py-1">
+                                    <option disabled value="">Choose</option>
+                                    <option v-for="p in presets" :key="p.name" :value="p.name">{{ p.name }}</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-slate-500 mb-1">End Point</label>
+                                <select v-model="newTrip.endPreset" class="w-full border rounded px-2 py-1">
+                                    <option disabled value="">Choose</option>
+                                    <option v-for="p in presets" :key="'end-'+p.name" :value="p.name">{{ p.name }}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-slate-500 mb-1">Driver Name</label>
+                                <input v-model="newTrip.driver_name" class="w-full border rounded px-2 py-1" placeholder="Driver Name" />
+                            </div>
+                            <div>
+                                <label class="block text-slate-500 mb-1">Driver Phone</label>
+                                <input v-model="newTrip.phone" class="w-full border rounded px-2 py-1" placeholder="+91-9XXXX-XXXXX" />
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-slate-500 mb-1">Vehicle Ownership</label>
+                                <select v-model="newTrip.company" class="w-full border rounded px-2 py-1">
+                                    <option value="Tata Steel">Tata Steel</option>
+                                    <option value="Third Party Travels">Third Party Travels</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-slate-500 mb-1">Whitelisted Stop</label>
+                                <select v-model="newTrip.whitelistPreset" class="w-full border rounded px-2 py-1">
+                                    <option value="">None</option>
+                                    <option v-for="p in whitelistOptions" :key="p.name" :value="p.name">{{ p.name }}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex justify-end">
+                            <button @click="registerTripFromForm" class="px-3 py-1 bg-blue-600 text-white rounded">Add & Start</button>
+                        </div>
+                    </div>
+                </div>
                 
                 <!-- Vehicle Selector -->
                 <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
@@ -187,23 +295,27 @@
                                 <i class="ph ph-toggle-left mr-1"></i>
                                 <span class="font-bold text-[10px] uppercase">Manual Override Active</span>
                             </div>
-                            <div class="text-slate-700 italic">Allow stop > 20 min at Midway Dhaba (Valid till 2:00 AM).</div>
+                            <div class="text-slate-700 italic">Allow stop > 20 min near Kharagpur checkpoint (Valid till 2:00 AM).</div>
                         </div>
 
                         <div>
                             <div class="font-bold text-slate-700 mb-1">Active Geofences</div>
                             <ul class="list-disc text-gray-500 space-y-0.5 pl-4">
                                 <li>Jamshedpur Plant (Radius: 2km)</li>
-                                <li>Midway Dhaba (Radius: 200m)</li>
                                 <li>Kolkata Hub (Radius: 5km)</li>
                             </ul>
                         </div>
                         <div class="pt-2 border-t border-slate-100">
-                            <div class="font-bold text-slate-700 mb-1">Active SOP Rules</div>
+                            <div class="flex items-center justify-between mb-1">
+                                <div class="font-bold text-slate-700">Active SOP Rules</div>
+                                <button class="flex items-center text-[10px] px-2 py-0.5 bg-slate-100 rounded border border-slate-200 text-slate-600" @click="openSopConfig">
+                                    <i class="ph ph-pencil mr-1"></i> Edit
+                                </button>
+                            </div>
                             <ul class="space-y-1 text-gray-500">
-                                <li><span class="font-semibold text-slate-700">SOP-089 (Stop):</span> Stop > 15 min outside approved zone → Alert.</li>
-                                <li><span class="font-semibold text-slate-700">SOP-102 (Weight):</span> Drop > 10% outside hub → Lockout.</li>
-                                <li><span class="font-semibold text-slate-700">SOP-075 (Route):</span> Deviation > 5 km from corridor → Control room notification.</li>
+                                <li><span class="font-semibold text-slate-700">SOP-089 (Stop):</span> Stop > {{ sop089Minutes }} min outside approved zone → Alert.</li>
+                                <li><span class="font-semibold text-slate-700">SOP-102 (Weight):</span> Drop > {{ sop102DropPercent }}% outside hub → Lockout.</li>
+                                <li><span class="font-semibold text-slate-700">SOP-075 (Route):</span> Deviation > {{ sop075DeviationKm }} km from corridor → Control room notification.</li>
                             </ul>
                         </div>
                     </div>
@@ -212,7 +324,7 @@
                 <!-- Demo Narrative Flow -->
                 <div class="bg-white rounded-lg shadow-sm border border-slate-200">
                     <div class="bg-slate-100 px-4 py-3 border-b border-slate-200 font-semibold text-sm text-slate-600 uppercase">
-                        Scenario Flow
+                        Live Demo Story
                     </div>
                     <div class="p-4">
                         <ol class="relative border-l border-slate-200 ml-2">                  
@@ -254,11 +366,11 @@
                 <div v-if="currentStatus" class="grid grid-cols-4 gap-4">
                     <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
                         <div class="text-xs text-gray-500 uppercase">Current Speed</div>
-                        <div class="text-2xl font-bold text-slate-800">{{ currentTelemetry?.speed_kmh.toFixed(1) }} <span class="text-sm font-normal text-gray-400">km/h</span></div>
+                        <div class="text-2xl font-bold text-slate-800">{{ safeSpeed(currentTelemetry) }} <span class="text-sm font-normal text-gray-400">km/h</span></div>
                     </div>
                     <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
                         <div class="text-xs text-gray-500 uppercase">Live Weight</div>
-                        <div class="text-2xl font-bold text-slate-800">{{ currentTelemetry?.weight_kg.toFixed(0) }} <span class="text-sm font-normal text-gray-400">kg</span></div>
+                        <div class="text-2xl font-bold text-slate-800">{{ safeWeight(currentTelemetry) }} <span class="text-sm font-normal text-gray-400">kg</span></div>
                     </div>
                      <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
                         <div class="text-xs text-gray-500 uppercase">Trip Status</div>
@@ -268,7 +380,38 @@
                     </div>
                      <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-200">
                         <div class="text-xs text-gray-500 uppercase">Last Update</div>
-                        <div class="text-sm font-mono mt-1">{{ formatTime(currentTelemetry?.timestamp) }}</div>
+                        <div class="text-sm font-mono mt-1">{{ safeTimestamp(currentTelemetry) }}</div>
+                    </div>
+                </div>
+
+                <!-- Analytics Snapshot -->
+                <div class="bg-white rounded-lg shadow-sm border border-slate-200">
+                    <div class="px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                        <h2 class="font-bold text-slate-700 flex items-center">
+                            <i class="ph ph-chart-bar text-emerald-600 mr-2 text-xl"></i>
+                            Analytics Snapshot
+                        </h2>
+                        <span class="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">Simulated</span>
+                    </div>
+                    <div class="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                        <div>
+                            <div class="font-semibold text-slate-600 mb-1">Top 5 Risky Routes</div>
+                            <ul class="list-disc pl-4 text-slate-700 space-y-0.5">
+                                <li>Jamshedpur → Kolkata (Eastern Corridor)</li>
+                                <li>Kharagpur → Kolaghat</li>
+                                <li>Kolaghat → Kolkata Hub</li>
+                                <li>Jamshedpur → Kharagpur</li>
+                                <li>Mid Corridor Variants</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <div class="font-semibold text-slate-600 mb-1">Avg Detection Time</div>
+                            <div class="text-slate-700">Critical events detected within ~5 minutes.</div>
+                        </div>
+                        <div>
+                            <div class="font-semibold text-slate-600 mb-1">Pilferage Risk Heatmap</div>
+                            <div class="text-slate-700">Most alerts concentrated in Eastern Corridor near Kolaghat.</div>
+                        </div>
                     </div>
                 </div>
 
@@ -339,14 +482,14 @@
 
                                             <!-- Status Tag -->
                                             <span v-if="alert.status === 'RESOLVED'" class="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 border border-green-200">RESOLVED</span>
-                                            <span v-else class="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-100">OPEN</span>
+                                            <span v-else class="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-100">UNRESOLVED</span>
 
                                             <span class="text-xs text-gray-400 ml-2">via {{ alert.agent_name }}</span>
                                         </div>
                                         <span class="text-xs text-gray-400 font-mono">{{ formatTime(alert.timestamp) }}</span>
                                     </div>
                                     
-                                    <h3 class="font-bold text-slate-800 text-sm mt-1">{{ alert.description }}</h3>
+                                    <h3 class="font-bold text-slate-800 text-sm mt-1">{{ displayDescription(alert) }}</h3>
                                     
                                     <!-- Rich Metadata Box -->
                                     <div class="mt-3 bg-slate-50 rounded border border-slate-200 p-3 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
@@ -364,6 +507,53 @@
                                     <div v-if="alert.action_taken" class="mt-2 flex items-center text-xs font-bold text-blue-700 bg-blue-50 px-2 py-1 rounded w-max">
                                         <i class="ph ph-lightning mr-1"></i> ACTION: {{ alert.action_taken }}
                                     </div>
+
+                                    <!-- SOP-Specific Actions -->
+                                    <div class="mt-3 flex items-center space-x-2">
+                                        <span v-if="alert.sop_rule && alert.sop_rule.includes('SOP-102')" class="px-2 py-1 text-[10px] bg-red-100 text-red-700 rounded border border-red-200">Security Alert</span>
+                                        <span v-if="alert.sop_rule && alert.sop_rule.includes('SOP-075')" class="px-2 py-1 text-[10px] bg-indigo-100 text-indigo-700 rounded border border-indigo-200">Control Room Notification</span>
+                                    </div>
+                                    <div class="mt-2 flex items-center space-x-2">
+                                        <button 
+                                            class="px-2 py-1 text-xs rounded bg-blue-600 text-white disabled:bg-slate-300 disabled:text-slate-600"
+                                            :disabled="alert.sop_rule && alert.sop_rule.includes('SOP-089') && minutesSince(alert.timestamp) < 15"
+                                            @click="contactDriver(alert)"
+                                        >
+                                            Contact Driver
+                                        </button>
+                                        <button 
+                                            v-if="alert._contactVisible"
+                                            class="px-2 py-1 text-xs rounded bg-slate-600 text-white"
+                                            @click="hideContact(alert.alert_id)"
+                                        >
+                                            Hide Contact
+                                        </button>
+                                        <button 
+                                            class="px-2 py-1 text-xs rounded bg-green-600 text-white"
+                                            @click="resolveAlert(alert.alert_id)"
+                                        >
+                                            Resolve
+                                        </button>
+                                        <button 
+                                            v-if="alert.status === 'RESOLVED'"
+                                            class="px-2 py-1 text-xs rounded bg-red-600 text-white"
+                                            @click="unresolveAlert(alert.alert_id)"
+                                        >
+                                            Unresolve
+                                        </button>
+                                        <span v-if="alert.sop_rule && alert.sop_rule.includes('SOP-089') && minutesSince(alert.timestamp) < 15" class="text-[10px] text-slate-500">Contact available after 15 min</span>
+                                    </div>
+
+                                    <!-- Driver Details -->
+                                    <div v-if="alert._contactVisible || (alert.sop_rule && alert.sop_rule.includes('SOP-089') && minutesSince(alert.timestamp) >= 15)" class="mt-3 bg-slate-50 rounded border border-slate-200 p-3 text-xs">
+                                        <div class="font-semibold text-slate-600 mb-1">Driver Contact</div>
+                                        <div class="text-slate-700" v-if="alert._contact">
+                                            <div>Driver: {{ alert._contact.driver_name }}</div>
+                                            <div>Phone: {{ alert._contact.phone }}</div>
+                                            <div>Travels: {{ alert._contact.company }}</div>
+                                        </div>
+                                        <div v-else class="text-slate-500">Fetching contact details...</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -372,6 +562,44 @@
 
             </div>
         </main>
+        <!-- Resolve Feedback Popup (In-App) -->
+        <div v-if="resolveFeedback && resolveFeedback.visible" class="fixed top-4 right-4 z-50">
+            <div :class="resolveFeedback.status === 'success' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'"
+                 class="px-3 py-2 rounded border shadow flex items-center space-x-2 text-sm">
+                <i :class="resolveFeedback.status === 'success' ? 'ph ph-check-circle' : 'ph ph-warning'"></i>
+                <span>{{ resolveFeedback.text }}</span>
+                <button class="ml-2 text-xs px-2 py-0.5 bg-slate-100 rounded" @click="closeResolveFeedback">Close</button>
+            </div>
+        </div>
+
+        <!-- SOP Configurator Modal -->
+        <div v-if="sopConfigModalVisible" class="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg shadow-lg w-full max-w-md border border-slate-200">
+                <div class="px-4 py-3 border-b border-slate-200 flex justify-between items-center">
+                    <div class="font-semibold text-sm text-slate-700">SOP Rules Configurator</div>
+                    <button class="text-slate-500 text-xs px-2 py-0.5 bg-slate-100 rounded" @click="closeSopConfig">Close</button>
+                </div>
+                <div class="p-4 text-xs space-y-3">
+                    <div>
+                        <label class="block text-slate-500 mb-1">SOP-089: Stop outside approved zone (minutes)</label>
+                        <input v-model.number="sop089Minutes" type="number" class="w-full border rounded px-2 py-1" min="1" />
+                    </div>
+                    <div>
+                        <label class="block text-slate-500 mb-1">SOP-102: Weight drop outside hub (%)</label>
+                        <input v-model.number="sop102DropPercent" type="number" class="w-full border rounded px-2 py-1" min="1" />
+                    </div>
+                    <div>
+                        <label class="block text-slate-500 mb-1">SOP-075: Route deviation (km)</label>
+                        <input v-model.number="sop075DeviationKm" type="number" class="w-full border rounded px-2 py-1" min="1" />
+                    </div>
+                </div>
+                <div class="px-4 py-3 border-t border-slate-200 flex justify-end">
+                    <button class="px-3 py-1 bg-blue-600 text-white rounded" @click="saveSopConfig">
+                        Save
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <footer class="bg-white border-t border-slate-200 mt-auto">
             <div class="container mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center text-xs text-slate-500">
@@ -394,20 +622,53 @@
         createApp({
             data() {
                 return {
+                    newTrip: {
+                        truck_id: '',
+                        weight: 25000,
+                        startPreset: '',
+                        endPreset: '',
+                        driver_name: '',
+                        phone: '',
+                        company: 'Tata Steel',
+                        whitelistPreset: ''
+                    },
+                    presets: [
+                        { name: 'Tata Steel Jamshedpur Plant', lat: 22.8046, lng: 86.2029 },
+                        { name: 'Kolkata Hub', lat: 22.5726, lng: 88.3639 },
+                        { name: 'Godown / Store Room', lat: 22.7000, lng: 87.1000 }
+                    ],
+                    whitelistOptions: [
+                        { name: 'Kharagpur Check', lat: 22.3460, lng: 87.2320, radius: 200, max: 30 },
+                        { name: 'Kolaghat Check', lat: 22.4327, lng: 87.8672, radius: 200, max: 30 },
+                        { name: 'Midway Dhaba', lat: 22.6000, lng: 87.0000, radius: 200, max: 45 }
+                    ],
+                    telemetryLoops: {},
                     trucks: [],
                     selectedTruck: null,
                     currentStatus: null,
                     currentTelemetry: null,
+                    truckStatuses: {},
+                    lastTelemetryByTruck: {},
                     alerts: [],
                     fleetSummary: { active_vehicles: 0, under_alert: 0 },
                     map: null,
                     marker: null,
+                    markersByTruck: {},
                     polling: null,
                     currentYear: new Date().getFullYear(),
-                    lastUpdate: new Date()
-                    ,vehicleIcon: null,
+                    lastUpdate: new Date(),
+                    vehicleIcon: null,
                     lastMarkerLatLng: null,
-                    animating: false
+                    animating: false,
+                    driverInfo: {},
+                    tileProviderIndex: 0,
+                    currentTileLayer: null,
+                    contactState: {},
+                    resolveFeedback: { visible: false, text: '', status: 'info' },
+                    sop089Minutes: 15,
+                    sop102DropPercent: 10,
+                    sop075DeviationKm: 5,
+                    sopConfigModalVisible: false
                 }
             },
             computed: {
@@ -416,6 +677,25 @@
                 }
             },
             methods: {
+                openSopConfig() {
+                    this.sopConfigModalVisible = true;
+                },
+                closeSopConfig() {
+                    this.sopConfigModalVisible = false;
+                },
+                saveSopConfig() {
+                    this.sopConfigModalVisible = false;
+                    this.resolveFeedback = { visible: true, text: 'SOP updated', status: 'success' };
+                },
+                safeSpeed(t) {
+                    return t && t.speed_kmh != null ? t.speed_kmh.toFixed(1) : '--';
+                },
+                safeWeight(t) {
+                    return t && t.weight_kg != null ? t.weight_kg.toFixed(0) : '--';
+                },
+                safeTimestamp(t) {
+                    return t && t.timestamp ? this.formatTime(t.timestamp) : '--:--:--';
+                },
                 formatTime(isoString) {
                     if (!isoString) return '--:--:--';
                     return new Date(isoString).toLocaleTimeString();
@@ -426,12 +706,172 @@
                 formatDateTime(d) {
                     return new Date(d).toLocaleString();
                 },
+                minutesSince(isoString) {
+                    const now = new Date();
+                    const t = new Date(isoString);
+                    return Math.floor((now.getTime() - t.getTime()) / 60000);
+                },
+                displayDescription(alert) {
+                    const d = alert && alert.description ? alert.description : '';
+                    if (alert && alert.status !== 'RESOLVED') {
+                        return d.replace(/^ALERT\s+RESOLVED/i, 'ALERT UNRESOLVED');
+                    }
+                    return d.replace(/^ALERT\s+UNRESOLVED/i, 'ALERT RESOLVED');
+                },
                 async fetchSummary() {
                     try {
                         const res = await axios.get('/api/v1/fleet/summary');
                         this.fleetSummary = res.data;
                         this.lastUpdate = new Date();
                     } catch (e) { console.error(e); }
+                },
+                async registerTripFromForm() {
+                    try {
+                        const start = this.presets.find(p => p.name === this.newTrip.startPreset);
+                        const end = this.presets.find(p => p.name === this.newTrip.endPreset);
+                        if (!start || !end || !this.newTrip.truck_id) {
+                            this.resolveFeedback = { visible: true, text: 'Unresolved', status: 'error' };
+                            return;
+                        }
+
+                        // Determine Whitelisted Stop
+                        let authStops = [];
+                        let whitelistStop = null;
+                        if (this.newTrip.whitelistPreset) {
+                            whitelistStop = this.whitelistOptions.find(p => p.name === this.newTrip.whitelistPreset);
+                            if (whitelistStop) {
+                                authStops.push({
+                                    location: { latitude: whitelistStop.lat, longitude: whitelistStop.lng },
+                                    radius_meters: whitelistStop.radius,
+                                    max_duration_minutes: whitelistStop.max,
+                                    name: whitelistStop.name
+                                });
+                            }
+                        }
+
+                        const trip = {
+                            trip_id: `TRIP-${Math.floor(Math.random()*9000)+1000}`,
+                            truck_id: this.newTrip.truck_id,
+                            start_location: { latitude: start.lat, longitude: start.lng },
+                            destination_location: { latitude: end.lat, longitude: end.lng },
+                            authorized_stops: authStops,
+                            total_expected_weight_kg: this.newTrip.weight,
+                            weight_tolerance_kg: 50.0
+                        };
+                        await axios.post('/api/v1/trips', trip);
+                        await axios.post('/api/v1/driver', {
+                            truck_id: this.newTrip.truck_id,
+                            driver_name: this.newTrip.driver_name || 'Unknown',
+                            phone: this.newTrip.phone || 'N/A',
+                            company: this.newTrip.company || 'Tata Steel'
+                        });
+                        this.trucks = Array.from(new Set([...this.trucks, this.newTrip.truck_id]));
+                        
+                        // Start Simulation Loop with Waypoints
+                        this.startTelemetryLoop(this.newTrip.truck_id, start, end, this.newTrip.weight, whitelistStop);
+                        
+                        this.resolveFeedback = { visible: true, text: 'Trip Started', status: 'success' };
+                    } catch (e) {
+                        console.error(e);
+                        this.resolveFeedback = { visible: true, text: 'Unresolved', status: 'error' };
+                    }
+                },
+                startTelemetryLoop(truckId, start, end, weight, whitelistStop) {
+                    // Path Construction: Start -> [Whitelist] -> Mistake(Unwhitelisted) -> End
+                    let path = [{ lat: start.lat, lng: start.lng, type: 'start' }];
+                    
+                    if (whitelistStop) {
+                        path.push({ lat: whitelistStop.lat, lng: whitelistStop.lng, type: 'whitelist' });
+                    }
+
+                    // Calculate Mistake Point (Unwhitelisted Stop)
+                    // Place it somewhere between the last point and end, but offset
+                    const last = path[path.length - 1];
+                    const mistakeLat = (last.lat + end.lat) / 2 + 0.02; // Small offset
+                    const mistakeLng = (last.lng + end.lng) / 2 - 0.02;
+                    path.push({ lat: mistakeLat, lng: mistakeLng, type: 'mistake' }); // This is the unwhitelisted stop
+
+                    path.push({ lat: end.lat, lng: end.lng, type: 'end' });
+
+                    let currentSegment = 0;
+                    let progress = 0;
+                    const speedFactor = 0.005; // "Slowly" - smaller increment per tick
+                    let isStopped = false;
+                    let stopTimer = 0; // Simulated minutes
+                    
+                    // Initial simulated time
+                    let simulatedTime = new Date();
+
+                    const timer = setInterval(async () => {
+                        if (currentSegment >= path.length - 1) {
+                            clearInterval(timer);
+                            delete this.telemetryLoops[truckId];
+                            return;
+                        }
+
+                        const p1 = path[currentSegment];
+                        const p2 = path[currentSegment + 1];
+
+                        // Interpolate
+                        const lat = p1.lat + (p2.lat - p1.lat) * progress;
+                        const lng = p1.lng + (p2.lng - p1.lng) * progress;
+
+                        // Check if we should stop at the destination of this segment
+                        // Logic: If we reach p2, and p2 is 'mistake', stop there.
+                        // If p2 is 'whitelist', maybe pause briefly?
+                        
+                        // Advance time normally
+                        simulatedTime = new Date(simulatedTime.getTime() + 1000); 
+
+                        let speed = 45.0;
+                        
+                        if (isStopped) {
+                            speed = 0.0;
+                            // Accelerate simulated time during stop to trigger alert faster
+                            // 1 real second = 1 simulated minute
+                            stopTimer++;
+                            simulatedTime = new Date(simulatedTime.getTime() + 60000); 
+                            
+                            // Check if done stopping
+                            if (stopTimer > 20) { // > 15 mins to trigger SOP-089
+                                isStopped = false;
+                                stopTimer = 0;
+                                currentSegment++;
+                                progress = 0;
+                            }
+                        } else {
+                            progress += speedFactor;
+                            if (progress >= 1) {
+                                progress = 1;
+                                // We reached p2
+                                if (p2.type === 'mistake') {
+                                    isStopped = true;
+                                    // Don't advance segment yet
+                                } else if (p2.type === 'whitelist') {
+                                    // Just pass through or brief pause?
+                                    // Let's pass through for smoothness or pause briefly
+                                    // User said "move to white listed", then "stopped in unwhitelisted"
+                                    currentSegment++;
+                                    progress = 0;
+                                } else {
+                                    currentSegment++;
+                                    progress = 0;
+                                }
+                            }
+                        }
+
+                        const telemetry = {
+                            truck_id: truckId,
+                            timestamp: simulatedTime.toISOString(),
+                            location: { latitude: lat, longitude: lng },
+                            weight_kg: weight + (Math.random()*4-2),
+                            speed_kmh: speed,
+                            ignition_on: true
+                        };
+                        try { await axios.post('/api/v1/telemetry', telemetry); } catch (_) {}
+                        
+                    }, 1000); // 1 tick per second
+                    this.telemetryLoops[truckId] = timer;
                 },
                 async fetchTrucks() {
                     try {
@@ -440,6 +880,25 @@
                         if (this.trucks.length > 0 && !this.selectedTruck) {
                             this.selectTruck(this.trucks[0]);
                         }
+                    } catch (e) { console.error(e); }
+                },
+                async fetchAllStatuses() {
+                    if (!this.trucks || this.trucks.length === 0) return;
+                    try {
+                        const requests = this.trucks.map(t => axios.get(`/api/v1/status/${t}`).then(r => ({ id: t, data: r.data })).catch(_ => null));
+                        const results = await Promise.all(requests);
+                        results.filter(Boolean).forEach(({ id, data }) => {
+                            this.truckStatuses[id] = data;
+                            const tel = data.last_telemetry;
+                            if (tel) {
+                                this.lastTelemetryByTruck[id] = tel;
+                                this.updateMapForTruck(id, tel);
+                                if (this.selectedTruck === id) {
+                                    this.currentStatus = data;
+                                    this.currentTelemetry = tel;
+                                }
+                            }
+                        });
                     } catch (e) { console.error(e); }
                 },
                 selectTruck(truckId) {
@@ -457,16 +916,88 @@
                         this.currentStatus = statusRes.data;
                         this.currentTelemetry = this.currentStatus.last_telemetry;
                         this.alerts = alertsRes.data;
+                        this.applyLocalUiState(this.alerts);
 
                         this.updateMap();
                     } catch (e) { console.error(e); }
                 },
+                applyLocalUiState(alerts) {
+                    alerts.forEach(a => {
+                        const cs = this.contactState[a.alert_id];
+                        if (cs) {
+                            a._contactVisible = cs.visible;
+                            a._contact = cs.data;
+                        }
+                    });
+                },
+                async resolveAlert(alertId) {
+                    try {
+                        const res = await axios.post('/api/v1/alerts/resolve', { alert_id: alertId });
+                        const updated = res.data;
+                        const idx = this.alerts.findIndex(a => a.alert_id === alertId);
+                        if (idx >= 0) this.alerts[idx].status = updated.status;
+                        this.applyLocalUiState(this.alerts);
+                        this.resolveFeedback = { visible: true, text: 'SOP resolved', status: 'success' };
+                        setTimeout(() => { this.resolveFeedback.visible = true; }, 0);
+                        setTimeout(() => { this.resolveFeedback.visible = false; }, 3000);
+                    } catch (e) { 
+                        console.error(e); 
+                        this.resolveFeedback = { visible: true, text: 'Unresolved', status: 'error' };
+                        setTimeout(() => { this.resolveFeedback.visible = true; }, 0);
+                        setTimeout(() => { this.resolveFeedback.visible = false; }, 3000);
+                    }
+                },
+                async unresolveAlert(alertId) {
+                    try {
+                        const res = await axios.post('/api/v1/alerts/unresolve', { alert_id: alertId });
+                        const updated = res.data;
+                        const idx = this.alerts.findIndex(a => a.alert_id === alertId);
+                        if (idx >= 0) this.alerts[idx].status = updated.status;
+                        this.applyLocalUiState(this.alerts);
+                        this.resolveFeedback = { visible: true, text: 'Marked Unresolved', status: 'error' };
+                        setTimeout(() => { this.resolveFeedback.visible = true; }, 0);
+                        setTimeout(() => { this.resolveFeedback.visible = false; }, 3000);
+                    } catch (e) {
+                        console.error(e);
+                        this.resolveFeedback = { visible: true, text: 'Unresolved', status: 'error' };
+                        setTimeout(() => { this.resolveFeedback.visible = true; }, 0);
+                        setTimeout(() => { this.resolveFeedback.visible = false; }, 3000);
+                    }
+                },
+                async contactDriver(alert) {
+                    try {
+                        const res = await axios.get(`/api/v1/driver/${alert.truck_id}`);
+                        const payload = { visible: true, data: res.data };
+                        this.contactState[alert.alert_id] = payload;
+                        this.contactState[alert.alert_id] = payload;
+                        alert._contact = payload.data;
+                        alert._contactVisible = payload.visible;
+                    } catch (e) { console.error(e); }
+                },
+                hideContact(alertId) {
+                    const cs = this.contactState[alertId];
+                    if (cs) cs.visible = false;
+                    const a = this.alerts.find(x => x.alert_id === alertId);
+                    if (a) a._contactVisible = false;
+                },
+                closeResolveFeedback() {
+                    this.resolveFeedback.visible = false;
+                },
                 initMap() {
-                    // Center on the Jamshedpur-Kolkata corridor
                     this.map = L.map('map').setView([22.5, 87.3], 9);
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        attribution: '© OpenStreetMap contributors'
+                    const transparent = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=';
+                    this.currentTileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                        attribution: '© CARTO',
+                        subdomains: 'abcd',
+                        errorTileUrl: transparent
                     }).addTo(this.map);
+                    const dhabaIcon = L.divIcon({
+                        html: '<div style=\"width:22px;height:22px;border-radius:50%;background:#fde68a;color:#92400e;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid #f59e0b;\">D</div>',
+                        className: 'vehicle-icon-wrapper',
+                        iconSize: [22, 22],
+                        iconAnchor: [11, 11]
+                    });
+                    L.marker([22.6000, 87.0000], { icon: dhabaIcon }).addTo(this.map).bindTooltip('Midway Dhaba', { direction: 'top' });
                     this.vehicleIcon = L.divIcon({
                         html: '<div class="vehicle-icon"><i class="ph ph-truck"></i></div>',
                         className: 'vehicle-icon-wrapper',
@@ -551,6 +1082,33 @@
                     // For demo, keep it centered
                     this.map.setView([lat, lng], 10);
                 },
+                updateMapForTruck(truckId, telemetry) {
+                    if (!telemetry || !this.map) return;
+                    const lat = telemetry.location.latitude;
+                    const lng = telemetry.location.longitude;
+                    if (!this.markersByTruck[truckId]) {
+                        const m = L.marker([lat, lng], { icon: this.vehicleIcon }).addTo(this.map);
+                        this.markersByTruck[truckId] = { marker: m, lastLatLng: L.latLng(lat, lng) };
+                        m.bindTooltip(truckId, { direction: 'top' });
+                    } else {
+                        const entry = this.markersByTruck[truckId];
+                        this.animateMarkerFor(entry, L.latLng(lat, lng));
+                    }
+                },
+                animateMarkerFor(entry, targetLatLng) {
+                    const startLatLng = entry.lastLatLng;
+                    const duration = 1200;
+                    const startTime = performance.now();
+                    const animate = (now) => {
+                        const t = Math.min((now - startTime) / duration, 1);
+                        const lat = startLatLng.lat + (targetLatLng.lat - startLatLng.lat) * t;
+                        const lng = startLatLng.lng + (targetLatLng.lng - startLatLng.lng) * t;
+                        entry.marker.setLatLng([lat, lng]);
+                        if (t < 1) requestAnimationFrame(animate);
+                        else entry.lastLatLng = targetLatLng;
+                    };
+                    requestAnimationFrame(animate);
+                },
                 animateMarkerTo(targetLatLng) {
                     if (!this.marker) return;
                     const startLatLng = this.marker.getLatLng();
@@ -573,7 +1131,7 @@
                     this.polling = setInterval(() => {
                         this.fetchTrucks();
                         this.fetchSummary();
-                        this.fetchStatus();
+                        this.fetchAllStatuses();
                     }, 2000);
                 }
             },
