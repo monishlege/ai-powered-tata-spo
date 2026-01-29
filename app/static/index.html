@@ -564,13 +564,14 @@
                                             Hide Contact
                                         </button>
                                         <button 
+                                            v-if="alert.status !== 'RESOLVED'"
                                             class="px-2 py-1 text-xs rounded bg-green-600 text-white"
                                             @click="resolveAlert(alert.alert_id)"
                                         >
                                             Resolve
                                         </button>
                                         <button 
-                                            v-if="alert.status === 'RESOLVED'"
+                                            v-else
                                             class="px-2 py-1 text-xs rounded bg-red-600 text-white"
                                             @click="unresolveAlert(alert.alert_id)"
                                         >
