@@ -1137,6 +1137,7 @@
                         const idx = this.alerts.findIndex(a => a.alert_id === alertId);
                         if (idx >= 0) this.alerts[idx].status = updated.status;
                         this.applyLocalUiState(this.alerts);
+                        await this.fetchStatus();
                         this.resolveFeedback = { visible: true, text: 'SOP resolved', status: 'success' };
                         setTimeout(() => { this.resolveFeedback.visible = true; }, 0);
                         setTimeout(() => { this.resolveFeedback.visible = false; }, 3000);
@@ -1154,6 +1155,7 @@
                         const idx = this.alerts.findIndex(a => a.alert_id === alertId);
                         if (idx >= 0) this.alerts[idx].status = updated.status;
                         this.applyLocalUiState(this.alerts);
+                        await this.fetchStatus();
                         this.resolveFeedback = { visible: true, text: 'Marked Unresolved', status: 'error' };
                         setTimeout(() => { this.resolveFeedback.visible = true; }, 0);
                         setTimeout(() => { this.resolveFeedback.visible = false; }, 3000);
