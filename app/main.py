@@ -8,6 +8,12 @@ from datetime import datetime, timedelta
 from app.models import TripConfig, Telemetry, Alert, GeoPoint
 from app.core.engine import IntelligenceEngine
 import os
+import uuid
+import hmac
+import hashlib
+import base64
+import json
+import time
 
 app = FastAPI(
     title="Tata Steel Rebar Anti-Pilferage AI System",
@@ -25,6 +31,32 @@ app.add_middleware(
 
 # Global Intelligence Engine
 engine = IntelligenceEngine()
+
+# In-memory users
+USERS = {}
+JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret")
+JWT_EXP_SECONDS = 3600
+
+# Utilities
+def _b64url(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode("utf-8")
+
+def _jwt(payload: dict) -> str:
+    header = {"alg": "HS256", "typ": "JWT"}
+    h = _b64url(json.dumps(header, separators=(",", ":")).encode("utf-8"))
+    p = _b64url(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
+    signing_input = f"{h}.{p}".encode("utf-8")
+    sig = hmac.new(JWT_SECRET.encode("utf-8"), signing_input, hashlib.sha256).digest()
+    s = _b64url(sig)
+    return f"{h}.{p}.{s}"
+
+def _hash_password(password: str, salt: str) -> str:
+    return hashlib.sha256((salt + password).encode("utf-8")).hexdigest()
+
+def _issue_token(email: str) -> str:
+    now = int(time.time())
+    payload = {"sub": email, "iat": now, "exp": now + JWT_EXP_SECONDS}
+    return _jwt(payload)
 
 # Mount Static Files
 static_dir = os.path.join(os.path.dirname(__file__), "static")
@@ -97,6 +129,12 @@ class CustodyEvent(BaseModel):
     photo_base64: str | None = None
     signature: str | None = None
     notes: str | None = None
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
 
 @app.post("/api/v1/alerts/resolve", tags=["Monitoring"])
 def resolve_alert(req: ResolveRequest):
@@ -140,3 +178,28 @@ def sync_edge(truck_id: str):
 @app.post("/api/v1/custody", tags=["CCTV/Chain of Custody"])
 def upload_custody(event: CustodyEvent):
     return engine.add_custody_event(event.truck_id, event.stop_name, event.photo_base64, event.signature, event.notes)
+
+@app.post("/api/v1/auth/register", tags=["Auth"])
+def register(req: RegisterRequest):
+    if ("@" not in req.email) or (len(req.password) < 4):
+        raise HTTPException(status_code=400, detail="Invalid credentials")
+    email = req.email.lower().strip()
+    if email in USERS:
+        raise HTTPException(status_code=409, detail="User already exists")
+    salt = uuid.uuid4().hex
+    pwd = _hash_password(req.password, salt)
+    USERS[email] = {"salt": salt, "password": pwd}
+    token = _issue_token(email)
+    return {"token": token, "user": {"email": email}}
+
+@app.post("/api/v1/auth/login", tags=["Auth"])
+def login(req: LoginRequest):
+    email = req.email.lower().strip()
+    user = USERS.get(email)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    hashed = _hash_password(req.password, user["salt"])
+    if hashed != user["password"]:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    token = _issue_token(email)
+    return {"token": token, "user": {"email": email}}

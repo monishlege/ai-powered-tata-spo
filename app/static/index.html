@@ -19,6 +19,8 @@
         .vehicle-icon-wrapper { background: transparent; border: none; }
         .vehicle-icon { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: rgba(37,99,235,0.15); color: #1e3a8a; box-shadow: 0 0 0 2px rgba(37,99,235,0.25); }
     </style>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+    <link rel="shortcut icon" href="/static/favicon.svg" />
 </head>
 <body class="bg-slate-50 font-sans text-slate-800">
     <div id="app" v-cloak class="min-h-screen flex flex-col">
@@ -606,6 +608,31 @@
             </div>
         </div>
 
+        <div v-if="!loggedIn" class="fixed inset-0 bg-white bg-opacity-95 flex items-center justify-center z-50">
+            <div class="w-full max-w-sm bg-white border border-slate-200 rounded-lg shadow p-4">
+                <div class="text-center font-bold text-slate-800 mb-3">{{ authMode === 'login' ? 'Login' : 'Register' }}</div>
+                <div class="space-y-2 text-xs">
+                    <div>
+                        <label class="block text-slate-500 mb-1">Email</label>
+                        <input v-model="authEmail" type="email" class="w-full border rounded px-2 py-1" placeholder="you@example.com" />
+                    </div>
+                    <div>
+                        <label class="block text-slate-500 mb-1">Password</label>
+                        <input v-model="authPassword" type="password" class="w-full border rounded px-2 py-1" placeholder="••••" />
+                    </div>
+                    <div v-if="authError" class="text-red-600">{{ authError }}</div>
+                </div>
+                <div class="flex justify-between items-center mt-3">
+                    <button class="text-slate-600 text-xs underline" @click="authMode = authMode === 'login' ? 'register' : 'login'">
+                        {{ authMode === 'login' ? 'Need an account? Register' : 'Have an account? Login' }}
+                    </button>
+                    <div class="space-x-2">
+                        <button v-if="authMode === 'login'" :disabled="authLoading" class="px-3 py-1 bg-blue-600 text-white rounded disabled:bg-slate-300" @click="submitLogin">Login</button>
+                        <button v-else :disabled="authLoading" class="px-3 py-1 bg-green-600 text-white rounded disabled:bg-slate-300" @click="submitRegister">Register</button>
+                    </div>
+                </div>
+            </div>
+        </div>
         <!-- SOP Configurator Modal -->
         <div v-if="sopConfigModalVisible" class="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
             <div class="bg-white rounded-lg shadow-lg w-full max-w-md border border-slate-200">
@@ -711,7 +738,13 @@
                     riskInfo: null,
                     edgeOfflineByTruck: {},
                     showCustodyModal: false,
-                    custodyForm: { stopName: '', photo_base64: null, signature: '', notes: '' }
+                    custodyForm: { stopName: '', photo_base64: null, signature: '', notes: '' },
+                    loggedIn: false,
+                    authMode: 'login',
+                    authEmail: '',
+                    authPassword: '',
+                    authLoading: false,
+                    authError: ''
                 }
             },
             computed: {
@@ -843,6 +876,36 @@
                         this.showCustodyModal = false;
                         this.resolveFeedback = { visible: true, text: 'Custody verified at whitelisted stop', status: 'success' };
                     } catch (e) { console.error(e); }
+                },
+                async submitLogin() {
+                    try {
+                        this.authLoading = true;
+                        this.authError = '';
+                        const res = await axios.post('/api/v1/auth/login', { email: this.authEmail, password: this.authPassword });
+                        const token = res.data && res.data.token;
+                        if (!token) throw new Error('No token');
+                        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+                        this.loggedIn = true;
+                    } catch (e) {
+                        this.authError = 'Invalid email or password';
+                    } finally {
+                        this.authLoading = false;
+                    }
+                },
+                async submitRegister() {
+                    try {
+                        this.authLoading = true;
+                        this.authError = '';
+                        const res = await axios.post('/api/v1/auth/register', { email: this.authEmail, password: this.authPassword });
+                        const token = res.data && res.data.token;
+                        if (!token) throw new Error('No token');
+                        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+                        this.loggedIn = true;
+                    } catch (e) {
+                        this.authError = 'Registration failed';
+                    } finally {
+                        this.authLoading = false;
+                    }
                 },
                 displayDescription(alert) {
                     const d = alert && alert.description ? alert.description : '';
