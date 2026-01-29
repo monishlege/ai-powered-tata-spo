@@ -463,15 +463,6 @@
                             </button>
                         </div>
                     </div>
-                    <div class="px-6 py-2 text-xs text-slate-700">
-                        <div class="font-semibold text-slate-600 mb-1">Simulated Intelligence Entries</div>
-                        <ul class="space-y-1">
-                            <li v-for="(log, idx) in intelLogEntries" :key="log.id" class="flex justify-between">
-                                <span>Log #{{ idx + 1 }} – {{ log.label }}</span>
-                                <span class="font-mono">{{ formatTime(log.time) }}</span>
-                            </li>
-                        </ul>
-                    </div>
                     
                     <div class="divide-y divide-slate-100 max-h-96 overflow-y-auto">
                         <div v-if="alerts.length === 0" class="p-4 text-xs text-slate-700 space-y-2">
@@ -529,7 +520,7 @@
 
                                             <span class="text-xs text-gray-400 ml-2">via {{ alert.agent_name }}</span>
                                         </div>
-                                        <span class="text-xs text-gray-400 font-mono">{{ formatTime(alert.timestamp) }}</span>
+                                        <span class="text-xs text-gray-400 font-mono">{{ formatSimTime(alert.timestamp) }}</span>
                                     </div>
                                     
                                     <h3 class="font-bold text-slate-800 text-sm mt-1">{{ displayDescription(alert) }}</h3>
@@ -763,6 +754,14 @@
                     const t = new Date(isoString);
                     return Math.floor((now.getTime() - t.getTime()) / 60000);
                 },
+                formatSimTime(isoString) {
+                    if (!this.startSimDateParts || !this.startSimTimeParts) return this.formatTime(isoString);
+                    const base = this.startSimTimeParts;
+                    const date = this.startSimDateParts;
+                    const hours = (base.h + this.intelLogCounter * 3) % 24;
+                    const dt = new Date(date.y, date.m, date.d, hours, base.m, base.s);
+                    return dt.toLocaleTimeString();
+                },
                 startIntelLog() {
                     const now = new Date();
                     this.startSimDateParts = { y: now.getFullYear(), m: now.getMonth(), d: now.getDate() };
@@ -770,10 +769,12 @@
                     this.intelLogEntries = [];
                     this.intelLogCounter = 0;
                     this.addIntelLog(0);
+                    this.updateSimulatedAlertTimes(0);
                     if (this.intelLogTimer) clearInterval(this.intelLogTimer);
                     this.intelLogTimer = setInterval(() => {
                         this.intelLogCounter += 1;
                         this.addIntelLog(this.intelLogCounter);
+                        this.updateSimulatedAlertTimes(this.intelLogCounter);
                     }, 30000);
                 },
                 addIntelLog(counter) {
@@ -785,6 +786,17 @@
                         id: `${date.y}-${date.m}-${date.d}-${counter}`,
                         time: dt.toISOString(),
                         label: `Journey progressed +${counter * 3}h`
+                    });
+                },
+                updateSimulatedAlertTimes(counter) {
+                    const base = this.startSimTimeParts;
+                    const date = this.startSimDateParts;
+                    if (!base || !date) return;
+                    const hours = (base.h + counter * 3) % 24;
+                    const dt = new Date(date.y, date.m, date.d, hours, base.m, base.s);
+                    const iso = dt.toISOString();
+                    this.alerts = this.alerts.map(a => {
+                        return Object.assign({}, a, { timestamp: iso });
                     });
                 },
                 async predictRiskForSelected() {
