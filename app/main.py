@@ -78,9 +78,7 @@ def receive_telemetry(data: Telemetry):
 
 @app.get("/api/v1/alerts", response_model=List[Alert], tags=["Monitoring"])
 def get_alerts(truck_id: str = None):
-    if truck_id:
-        return [a for a in engine.alerts if a.truck_id == truck_id]
-    return engine.alerts
+    return engine.get_alerts(truck_id)
 
 @app.get("/api/v1/trucks", tags=["Monitoring"])
 def get_active_trucks():
