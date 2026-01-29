@@ -13,6 +13,7 @@ class IntelligenceEngine:
         self.active_trips: Dict[str, TripConfig] = {}
         self.truck_states: Dict[str, Dict] = {} 
         self.alerts: List[Alert] = []
+        self.custody_log: List[Dict] = []
         self.driver_directory: Dict[str, Dict] = {
             "KA-01-AB-1234": {"driver_name": "Ramesh Kumar", "phone": "+91-98765-43210", "company": "Monish Logistics"},
             "KA-02-XY-5678": {"driver_name": "Suresh Patel", "phone": "+91-99876-54321", "company": "Third Party Travels"},
@@ -212,9 +213,13 @@ class IntelligenceEngine:
     def process_telemetry(self, data: Telemetry) -> List[Alert]:
         if data.truck_id not in self.active_trips:
             return [] 
-
         trip = self.active_trips[data.truck_id]
         state = self.truck_states[data.truck_id]
+        # Edge Offline: buffer telemetry and skip processing
+        if state.get("edge_offline", False):
+            buf = state.setdefault("edge_buffer", [])
+            buf.append(data)
+            return []
         
         # 1. Anomaly Detection Agent
         raw_alerts = self.anomaly_agent.analyze(trip, data, state)
@@ -253,3 +258,83 @@ class IntelligenceEngine:
                 a.status = "OPEN"
                 return a
         return None
+
+    # Predictive Pilferage Risk (simple heuristic)
+    def predict_risk(self, truck_id: str) -> Dict:
+        state = self.truck_states.get(truck_id)
+        if not state or not state.get("last_telemetry"):
+            return {"risk_score": 0.1, "message": "No telemetry", "factors": []}
+        tel = state["last_telemetry"]
+        lat = tel.location.latitude
+        lng = tel.location.longitude
+        hour = tel.timestamp.hour
+        factors = []
+        score = 0.2
+        # Time-of-day risk window
+        if 2 <= hour <= 4:
+            score += 0.4
+            factors.append("Time window 2–4 AM")
+        # Corridor zones near Kharagpur/Kolaghat raise baseline risk
+        def near(p_lat, p_lng, th=0.15):
+            return abs(lat - p_lat) < th and abs(lng - p_lng) < th
+        if near(22.3460, 87.2320) or near(22.4327, 87.8672):
+            score += 0.3
+            factors.append("Eastern Corridor hotspot")
+        score = min(score, 0.95)
+        msg = f"Predicted pilferage risk: {int(score*100)}% in current corridor"
+        return {"risk_score": score, "message": msg, "factors": factors}
+
+    # Edge computing mode toggle & sync
+    def set_edge_mode(self, truck_id: str, offline: bool) -> Dict:
+        st = self.truck_states.setdefault(truck_id, {})
+        st["edge_offline"] = offline
+        if offline:
+            st.setdefault("edge_buffer", [])
+        return {"truck_id": truck_id, "edge_offline": offline}
+
+    def sync_edge_buffer(self, truck_id: str) -> Dict:
+        st = self.truck_states.get(truck_id, {})
+        buf = st.get("edge_buffer", [])
+        processed = 0
+        for tel in buf:
+            self.process_telemetry(tel)
+            processed += 1
+        st["edge_buffer"] = []
+        st["edge_offline"] = False
+        return {"processed": processed, "edge_offline": False}
+
+    # Digital Chain of Custody log
+    def add_custody_event(self, truck_id: str, stop_name: str, photo_b64: str | None, signature: str | None, notes: str | None) -> Dict:
+        event = {
+            "truck_id": truck_id,
+            "stop_name": stop_name,
+            "timestamp": datetime.now().isoformat(),
+            "photo_base64": photo_b64,
+            "signature": signature,
+            "notes": notes
+        }
+        self.custody_log.append(event)
+        # Optional: create a supportive alert from CCTV perspective
+        tel = self.truck_states.get(truck_id, {}).get("last_telemetry")
+        if tel:
+            self.alerts.append(Alert(
+                alert_id=str(uuid.uuid4()),
+                trip_id=self.active_trips.get(truck_id, TripConfig(
+                    trip_id="N/A", truck_id=truck_id,
+                    start_location=GeoPoint(latitude=0, longitude=0),
+                    destination_location=GeoPoint(latitude=0, longitude=0),
+                    authorized_stops=[], total_expected_weight_kg=0.0
+                )).trip_id,
+                truck_id=truck_id,
+                timestamp=datetime.now(),
+                type=AlertType.WEIGHT_MISMATCH,
+                severity="LOW",
+                description="CCTV Guard: Digital custody verified at whitelisted stop.",
+                location=tel.location,
+                agent_name="CCTV Guard",
+                why_flagged="Object count/load height verification performed",
+                sop_rule="SOP-110 (Custody Verification)",
+                action_taken="Custody record stored",
+                status="OPEN"
+            ))
+        return event

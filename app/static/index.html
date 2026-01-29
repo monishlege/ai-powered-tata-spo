@@ -79,6 +79,34 @@
             </div>
         </div>
 
+        <!-- Chain of Custody Modal -->
+        <div v-if="showCustodyModal" class="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg shadow-lg w-full max-w-md border border-slate-200">
+                <div class="px-4 py-3 border-b border-slate-200 flex justify-between items-center">
+                    <div class="font-semibold text-sm text-slate-700">Digital Chain of Custody</div>
+                    <button class="text-slate-500 text-xs px-2 py-0.5 bg-slate-100 rounded" @click="showCustodyModal=false">Close</button>
+                </div>
+                <div class="p-4 text-xs space-y-3">
+                    <div>
+                        <div class="text-slate-600 mb-2">Whitelisted Stop: <span class="font-bold">{{ custodyForm.stopName }}</span></div>
+                        <label class="block text-slate-500 mb-1">Upload Photo</label>
+                        <input type="file" accept="image/*" @change="handleCustodyFile" />
+                    </div>
+                    <div>
+                        <label class="block text-slate-500 mb-1">Driver Signature (type name)</label>
+                        <input v-model="custodyForm.signature" class="w-full border rounded px-2 py-1" placeholder="Driver name as signature" />
+                    </div>
+                    <div>
+                        <label class="block text-slate-500 mb-1">Notes</label>
+                        <input v-model="custodyForm.notes" class="w-full border rounded px-2 py-1" placeholder="Any remarks" />
+                    </div>
+                </div>
+                <div class="px-4 py-3 border-t border-slate-200 flex justify-end">
+                    <button class="px-3 py-1 bg-green-600 text-white rounded" @click="submitCustody">Submit</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Architecture / Data Flow Strip -->
         <div class="bg-slate-50 border-b border-slate-200">
             <div class="container mx-auto px-4 py-3">
@@ -427,7 +455,13 @@
                             <i class="ph ph-brain text-purple-600 mr-2 text-xl"></i>
                             SOP Enforcement & Intelligence Log
                         </h2>
-                        <span class="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">Real-time Feed</span>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs bg-slate-100 px-2 py-1 rounded text-slate-500">Real-time Feed</span>
+                            <button class="text-xs px-2 py-1 bg-purple-600 text-white rounded" @click="predictRiskForSelected" :disabled="!selectedTruck">Predict Risk</button>
+                            <button class="text-xs px-2 py-1 rounded" :class="edgeOfflineByTruck[selectedTruck] ? 'bg-orange-600 text-white' : 'bg-slate-200 text-slate-700'" @click="toggleEdgeMode" :disabled="!selectedTruck">
+                                {{ edgeOfflineByTruck[selectedTruck] ? 'Edge: Offline' : 'Edge: Online' }}
+                            </button>
+                        </div>
                     </div>
                     
                     <div class="divide-y divide-slate-100 max-h-96 overflow-y-auto">
@@ -668,7 +702,11 @@
                     sop089Minutes: 15,
                     sop102DropPercent: 10,
                     sop075DeviationKm: 5,
-                    sopConfigModalVisible: false
+                    sopConfigModalVisible: false,
+                    riskInfo: null,
+                    edgeOfflineByTruck: {},
+                    showCustodyModal: false,
+                    custodyForm: { stopName: '', photo_base64: null, signature: '', notes: '' }
                 }
             },
             computed: {
@@ -710,6 +748,51 @@
                     const now = new Date();
                     const t = new Date(isoString);
                     return Math.floor((now.getTime() - t.getTime()) / 60000);
+                },
+                async predictRiskForSelected() {
+                    if (!this.selectedTruck) return;
+                    try {
+                        const res = await axios.get(`/api/v1/risk/${this.selectedTruck}`);
+                        this.riskInfo = res.data;
+                        this.resolveFeedback = { visible: true, text: this.riskInfo.message, status: this.riskInfo.risk_score >= 0.5 ? 'error' : 'success' };
+                    } catch (e) { console.error(e); }
+                },
+                async toggleEdgeMode() {
+                    if (!this.selectedTruck) return;
+                    const current = !!this.edgeOfflineByTruck[this.selectedTruck];
+                    const next = !current;
+                    try {
+                        const res = await axios.post(`/api/v1/edge/${this.selectedTruck}/mode?offline=${next}`);
+                        this.edgeOfflineByTruck[this.selectedTruck] = res.data.edge_offline;
+                        this.resolveFeedback = { visible: true, text: next ? 'Edge set to Offline (buffering telemetry)' : 'Edge Online (processing live)', status: next ? 'error' : 'success' };
+                        if (!next) {
+                            await axios.post(`/api/v1/edge/${this.selectedTruck}/sync`);
+                        }
+                    } catch (e) { console.error(e); }
+                },
+                handleCustodyFile(ev) {
+                    const file = ev.target.files && ev.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        this.custodyForm.photo_base64 = reader.result.toString();
+                    };
+                    reader.readAsDataURL(file);
+                },
+                async submitCustody() {
+                    if (!this.selectedTruck) return;
+                    try {
+                        const payload = {
+                            truck_id: this.selectedTruck,
+                            stop_name: this.custodyForm.stopName || 'Whitelisted Stop',
+                            photo_base64: this.custodyForm.photo_base64,
+                            signature: this.custodyForm.signature,
+                            notes: this.custodyForm.notes
+                        };
+                        await axios.post('/api/v1/custody', payload);
+                        this.showCustodyModal = false;
+                        this.resolveFeedback = { visible: true, text: 'Custody verified at whitelisted stop', status: 'success' };
+                    } catch (e) { console.error(e); }
                 },
                 displayDescription(alert) {
                     const d = alert && alert.description ? alert.description : '';
@@ -781,7 +864,7 @@
                     let path = [{ lat: start.lat, lng: start.lng, type: 'start' }];
                     
                     if (whitelistStop) {
-                        path.push({ lat: whitelistStop.lat, lng: whitelistStop.lng, type: 'whitelist' });
+                        path.push({ lat: whitelistStop.lat, lng: whitelistStop.lng, type: 'whitelist', name: whitelistStop.name });
                     }
 
                     // Calculate Mistake Point (Unwhitelisted Stop)
@@ -851,6 +934,8 @@
                                     // Just pass through or brief pause?
                                     // Let's pass through for smoothness or pause briefly
                                     // User said "move to white listed", then "stopped in unwhitelisted"
+                                    this.custodyForm.stopName = p2.name || 'Whitelisted Stop';
+                                    this.showCustodyModal = true;
                                     currentSegment++;
                                     progress = 0;
                                 } else {

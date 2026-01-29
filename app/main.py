@@ -91,6 +91,12 @@ class DriverInfo(BaseModel):
     driver_name: str
     phone: str
     company: str
+class CustodyEvent(BaseModel):
+    truck_id: str
+    stop_name: str
+    photo_base64: str | None = None
+    signature: str | None = None
+    notes: str | None = None
 
 @app.post("/api/v1/alerts/resolve", tags=["Monitoring"])
 def resolve_alert(req: ResolveRequest):
@@ -114,3 +120,23 @@ def get_driver(truck_id: str):
 def set_driver(info: DriverInfo):
     engine.set_driver_info(info.truck_id, info.driver_name, info.phone, info.company)
     return {"status": "ok"}
+
+# Predictive Pilferage Risk (simple heuristic)
+@app.get("/api/v1/risk/{truck_id}", tags=["AI Innovation"])
+def predict_risk(truck_id: str):
+    return engine.predict_risk(truck_id)
+
+# Edge computing mode toggle
+@app.post("/api/v1/edge/{truck_id}/mode", tags=["Edge"])
+def set_edge_mode(truck_id: str, offline: bool = True):
+    return engine.set_edge_mode(truck_id, offline)
+
+# Edge buffer sync when signal returns
+@app.post("/api/v1/edge/{truck_id}/sync", tags=["Edge"])
+def sync_edge(truck_id: str):
+    return engine.sync_edge_buffer(truck_id)
+
+# Digital Chain of Custody upload
+@app.post("/api/v1/custody", tags=["CCTV/Chain of Custody"])
+def upload_custody(event: CustodyEvent):
+    return engine.add_custody_event(event.truck_id, event.stop_name, event.photo_base64, event.signature, event.notes)
