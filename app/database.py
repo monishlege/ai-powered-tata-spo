@@ -6,11 +6,20 @@ sqlite_file_name = "tata_spo.db"
 
 connect_args = {"check_same_thread": False}
 
+def _db_path() -> str:
+    vercel = os.environ.get("VERCEL") == "1"
+    if vercel:
+        return os.path.join("/tmp", sqlite_file_name)
+    return sqlite_file_name
+
 def _plain_sqlite_url(path: str) -> str:
     return f"sqlite:///{path}"
-
+    
 def _make_sqlcipher_engine(key: str, path: str):
-    import sqlcipher3
+    try:
+        import sqlcipher3
+    except ImportError as e:
+        raise e
 
     def _creator():
         conn = sqlcipher3.connect(path, check_same_thread=False)
@@ -35,7 +44,7 @@ def _migrate_plain_to_encrypted(key: str) -> None:
     temp_encrypted = sqlite_file_name + ".enc"
     if os.path.exists(temp_encrypted):
         os.remove(temp_encrypted)
-    plain_engine = create_engine(_plain_sqlite_url(sqlite_file_name), connect_args=connect_args)
+    plain_engine = create_engine(_plain_sqlite_url(_db_path()), connect_args=connect_args)
     encrypted_engine = _make_sqlcipher_engine(key, temp_encrypted)
 
     SQLModel.metadata.create_all(encrypted_engine)
@@ -54,18 +63,25 @@ def _migrate_plain_to_encrypted(key: str) -> None:
     backup = sqlite_file_name + ".bak"
     if os.path.exists(backup):
         os.remove(backup)
-    if os.path.exists(sqlite_file_name):
-        os.replace(sqlite_file_name, backup)
-    os.replace(temp_encrypted, sqlite_file_name)
+    src = _db_path()
+    if os.path.exists(src):
+        os.replace(src, backup)
+    os.replace(temp_encrypted, src)
 
 def _build_engine():
     key = os.environ.get("DB_ENCRYPTION_KEY")
+    path = _db_path()
     if key:
-        if _is_plain_sqlite(sqlite_file_name):
+        # Avoid migration on Vercel ephemeral FS; just use encrypted engine if available
+        if not (os.environ.get("VERCEL") == "1") and _is_plain_sqlite(path):
             _migrate_plain_to_encrypted(key)
-        return _make_sqlcipher_engine(key, sqlite_file_name)
+        try:
+            return _make_sqlcipher_engine(key, path)
+        except ImportError:
+            # Fallback when sqlcipher3 is unavailable
+            return create_engine(_plain_sqlite_url(path), connect_args=connect_args)
     else:
-        return create_engine(_plain_sqlite_url(sqlite_file_name), connect_args=connect_args)
+        return create_engine(_plain_sqlite_url(path), connect_args=connect_args)
 
 engine = _build_engine()
 
